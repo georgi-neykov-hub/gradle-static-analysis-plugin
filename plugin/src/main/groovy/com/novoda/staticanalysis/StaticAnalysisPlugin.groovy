@@ -1,12 +1,13 @@
 package com.novoda.staticanalysis
 
-import com.novoda.staticanalysis.internal.CodeQualityConfigurator
+import com.novoda.staticanalysis.internal.Configurator
 import com.novoda.staticanalysis.internal.checkstyle.CheckstyleConfigurator
 import com.novoda.staticanalysis.internal.detekt.DetektConfigurator
 import com.novoda.staticanalysis.internal.findbugs.FindbugsConfigurator
 import com.novoda.staticanalysis.internal.ktlint.KtlintConfigurator
 import com.novoda.staticanalysis.internal.lint.LintConfigurator
 import com.novoda.staticanalysis.internal.pmd.PmdConfigurator
+import com.novoda.staticanalysis.internal.spotbugs.SpotBugsConfiguratorFactory
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -32,14 +33,15 @@ class StaticAnalysisPlugin implements Plugin<Project> {
         }
     }
 
-    private static List<CodeQualityConfigurator> createConfigurators(Project project,
-                                                                     StaticAnalysisExtension pluginExtension,
-                                                                     Task evaluateViolations) {
+    private static List<Configurator> createConfigurators(Project project,
+                                                          StaticAnalysisExtension pluginExtension,
+                                                          Task evaluateViolations) {
         NamedDomainObjectContainer<Violations> violationsContainer = pluginExtension.allViolations
         [
                 CheckstyleConfigurator.create(project, violationsContainer, evaluateViolations),
                 PmdConfigurator.create(project, violationsContainer, evaluateViolations),
                 FindbugsConfigurator.create(project, violationsContainer, evaluateViolations),
+                SpotBugsConfiguratorFactory.create(project, violationsContainer, evaluateViolations),
                 DetektConfigurator.create(project, violationsContainer, evaluateViolations),
                 KtlintConfigurator.create(project, violationsContainer, evaluateViolations),
                 LintConfigurator.create(project, violationsContainer, evaluateViolations)

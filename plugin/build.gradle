@@ -19,8 +19,13 @@ sourceSets {
     }
 }
 
+repositories {
+    gradlePluginPortal()
+}
+
 dependencies {
     implementation libraries.gradleApi
+    compileOnly gradlePlugins.spotbugs
 
     testCompile libraries.gradleTestKit
     testCompile libraries.junit
