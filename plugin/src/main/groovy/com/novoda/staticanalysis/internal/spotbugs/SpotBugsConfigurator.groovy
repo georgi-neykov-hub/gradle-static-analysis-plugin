@@ -6,6 +6,7 @@ import com.github.spotbugs.SpotBugsTask
 import com.novoda.staticanalysis.Violations
 import com.novoda.staticanalysis.internal.CodeQualityConfigurator
 import com.novoda.staticanalysis.internal.findbugs.CollectFindbugsViolationsTask
+import com.novoda.staticanalysis.internal.findbugs.GenerateFindBugsHtmlReport
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.file.ConfigurableFileTree
@@ -15,6 +16,8 @@ import org.gradle.api.tasks.SourceSet
 import java.nio.file.Path
 
 class SpotBugsConfigurator extends CodeQualityConfigurator<SpotBugsTask, SpotBugsExtension> {
+
+    protected boolean htmlReportEnabled = true
 
     SpotBugsConfigurator(Project project, Violations violations, Task evaluateViolations) {
         super(project, violations, evaluateViolations)
@@ -84,9 +87,7 @@ class SpotBugsConfigurator extends CodeQualityConfigurator<SpotBugsTask, SpotBug
     }
 
     private static List<String> createIncludePatterns(FileCollection sourceFiles, List<File> sourceDirs) {
-        List<Path> includedSourceFilesPaths = sourceFiles.matching { '**/*.java' }.files.collect {
-            it.toPath()
-        }
+        List<Path> includedSourceFilesPaths = sourceFiles.matching { '**/*.java' }.files.collect { it.toPath() }
         List<Path> sourceDirsPaths = sourceDirs.collect { it.toPath() }
         createRelativePaths(includedSourceFilesPaths, sourceDirsPaths)
                 .collect { Path relativePath -> (relativePath as String) - '.java' + '*' }
@@ -116,21 +117,35 @@ class SpotBugsConfigurator extends CodeQualityConfigurator<SpotBugsTask, SpotBug
     }
 
     @Override
-    protected void configureReportEvaluation(SpotBugsTask task, Violations violations) {
-        task.ignoreFailures = true
-        task.reports.xml.enabled = true
-        task.reports.html.enabled = false
+    protected void configureReportEvaluation(SpotBugsTask spotbugs, Violations violations) {
+        spotbugs.ignoreFailures = true
+        spotbugs.reports.xml.enabled = true
+        spotbugs.reports.html.enabled = false
 
-        def collectViolations = createViolationsCollectionTask(task, violations)
-
+        def collectViolations = createViolationsCollectionTask(spotbugs, violations)
         evaluateViolations.dependsOn collectViolations
-        collectViolations.dependsOn task
+
+        if (htmlReportEnabled) {
+            def generateHtmlReport = createHtmlReportTask(spotbugs, collectViolations.xmlReportFile, collectViolations.htmlReportFile)
+            collectViolations.dependsOn generateHtmlReport
+            generateHtmlReport.dependsOn spotbugs
+        } else {
+            collectViolations.dependsOn spotbugs
+        }
     }
 
     private CollectFindbugsViolationsTask createViolationsCollectionTask(SpotBugsTask spotBugs, Violations violations) {
         def task = project.tasks.maybeCreate("collect${spotBugs.name.capitalize()}Violations", CollectFindbugsViolationsTask)
         task.xmlReportFile = spotBugs.reports.xml.destination
         task.violations = violations
+        task
+    }
+
+    private GenerateFindBugsHtmlReport createHtmlReportTask(SpotBugsTask spotBugs, File xmlReportFile, File htmlReportFile) {
+        def task = project.tasks.maybeCreate("generate${spotBugs.name.capitalize()}HtmlReport", GenerateFindBugsHtmlReport)
+        task.xmlReportFile = xmlReportFile
+        task.htmlReportFile = htmlReportFile
+        task.classpath = spotBugs.spotbugsClasspath
         task
     }
 }
