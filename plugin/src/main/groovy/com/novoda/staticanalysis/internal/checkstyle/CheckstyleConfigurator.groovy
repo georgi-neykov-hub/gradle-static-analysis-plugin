@@ -1,5 +1,6 @@
 package com.novoda.staticanalysis.internal.checkstyle
 
+import com.novoda.staticanalysis.EvaluateViolationsTask
 import com.novoda.staticanalysis.Violations
 import com.novoda.staticanalysis.internal.CodeQualityConfigurator
 import com.novoda.staticanalysis.internal.QuietLogger
@@ -73,17 +74,14 @@ class CheckstyleConfigurator extends CodeQualityConfigurator<Checkstyle, Checkst
         checkstyle.showViolations = false
         checkstyle.ignoreFailures = true
         checkstyle.metaClass.getLogger = { QuietLogger.INSTANCE }
-
-        def collectViolations = createCollectViolationsTask(checkstyle, violations)
-
-        evaluateViolations.dependsOn collectViolations
-        collectViolations.dependsOn checkstyle
     }
 
-    private CollectCheckstyleViolationsTask createCollectViolationsTask(Checkstyle checkstyle, Violations violations) {
-        def task = project.tasks.maybeCreate("collect${checkstyle.name.capitalize()}Violations", CollectCheckstyleViolationsTask)
+    @Override
+    protected Task createCollectViolationsTask(Checkstyle checkstyle, Violations violations) {
+        def task = project.tasks.maybeCreate("collect${checkstyle.name.capitalize()}Violations",
+                CollectCheckstyleViolationsTask)
         task.xmlReportFile = checkstyle.reports.xml.destination
         task.violations = violations
-        task
+        return task
     }
 }

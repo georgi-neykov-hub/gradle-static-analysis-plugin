@@ -87,7 +87,7 @@ class FindbugsConfigurator extends CodeQualityConfigurator<FindBugs, FindBugsExt
         project.afterEvaluate {
             project.sourceSets.each { SourceSet sourceSet ->
                 String taskName = sourceSet.getTaskName(toolName, null)
-                FindBugs task = project.tasks.findByName(taskName)
+                FindBugs task = (FindBugs) project.tasks.findByName(taskName)
                 if (task != null) {
                     sourceFilter.applyTo(task)
                     task.conventionMapping.map("classes", {
@@ -136,24 +136,22 @@ class FindbugsConfigurator extends CodeQualityConfigurator<FindBugs, FindBugsExt
         findBugs.ignoreFailures = true
         findBugs.reports.xml.enabled = true
         findBugs.reports.html.enabled = false
-
-        def collectViolations = createViolationsCollectionTask(findBugs, violations)
-        evaluateViolations.dependsOn collectViolations
-
-        if (htmlReportEnabled) {
-            def generateHtmlReport = createHtmlReportTask(findBugs, collectViolations.xmlReportFile, collectViolations.htmlReportFile)
-            collectViolations.dependsOn generateHtmlReport
-            generateHtmlReport.dependsOn findBugs
-        } else {
-            collectViolations.dependsOn findBugs
-        }
     }
 
-    private CollectFindbugsViolationsTask createViolationsCollectionTask(FindBugs findBugs, Violations violations) {
-        def task = project.tasks.maybeCreate("collect${findBugs.name.capitalize()}Violations", CollectFindbugsViolationsTask)
+    @Override
+    protected Task createCollectViolationsTask(FindBugs findBugs, Violations violations) {
+        CollectFindbugsViolationsTask task = project.tasks.maybeCreate("collect${findBugs.name.capitalize()}Violations", CollectFindbugsViolationsTask)
         task.xmlReportFile = findBugs.reports.xml.destination
         task.violations = violations
-        task
+
+        if (htmlReportEnabled) {
+            def generateHtmlReport = createHtmlReportTask(findBugs, task.xmlReportFile, task.htmlReportFile)
+            task.dependsOn generateHtmlReport
+            generateHtmlReport.dependsOn findBugs
+        } else {
+            task.dependsOn findBugs
+        }
+        return task
     }
 
     private GenerateFindBugsHtmlReport createHtmlReportTask(FindBugs findBugs, File xmlReportFile, File htmlReportFile) {
@@ -162,7 +160,6 @@ class FindbugsConfigurator extends CodeQualityConfigurator<FindBugs, FindBugsExt
         task.htmlReportFile = htmlReportFile
         task.classpath = findBugs.findbugsClasspath
         task.onlyIf { xmlReportFile?.exists() }
-        task
     }
 
     private def getAndroidJar() {

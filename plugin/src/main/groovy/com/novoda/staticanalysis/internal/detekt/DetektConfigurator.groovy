@@ -1,9 +1,12 @@
 package com.novoda.staticanalysis.internal.detekt
 
+import com.novoda.staticanalysis.EvaluateViolationsTask
 import com.novoda.staticanalysis.StaticAnalysisExtension
 import com.novoda.staticanalysis.Violations
+import com.novoda.staticanalysis.ViolationsEvaluator
 import com.novoda.staticanalysis.internal.Configurator
 import com.novoda.staticanalysis.internal.checkstyle.CollectCheckstyleViolationsTask
+import org.codehaus.groovy.tools.shell.Evaluator
 import org.gradle.api.GradleException
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
@@ -21,7 +24,7 @@ class DetektConfigurator implements Configurator {
     private final Project project
     private final Violations violations
     private final Task evaluateViolations
-
+    protected final ViolationsEvaluator evaluator
 
     static DetektConfigurator create(Project project,
                                      NamedDomainObjectContainer<Violations> violationsContainer,
@@ -47,14 +50,23 @@ class DetektConfigurator implements Configurator {
                 throw new GradleException(DETEKT_NOT_APPLIED)
             }
 
-            def detekt = project.extensions.findByName('detekt')
-            setDefaultXmlReport(detekt)
-            config.delegate = detekt
+            def detektExtension = project.extensions.findByName('detekt')
+            setDefaultXmlReport(detektExtension)
+            config.delegate = detektExtension
             config()
 
-            def collectViolations = configureToolTask(detekt)
+            def collectViolations = configureToolTasks(detektExtension)
+            configureDetektEvaluationsTask()
             evaluateViolations.dependsOn collectViolations
         }
+    }
+
+    private Task configureDetektEvaluationsTask(Task collectViolations) {
+        EvaluateViolationsTask task = project.tasks.create("evaluateDetektViolations", EvaluateViolationsTask)
+        task.group = 'verification'
+        task.allViolations = {Collections.singleton(violations)}
+        task.evaluator = {evaluator}
+        task.dependsOn(collectViolations)
     }
 
     private void setDefaultXmlReport(detekt) {
@@ -66,7 +78,7 @@ class DetektConfigurator implements Configurator {
         }
     }
 
-    private CollectCheckstyleViolationsTask configureToolTask(detekt) {
+    private CollectCheckstyleViolationsTask configureToolTasks(detektExtension) {
         def detektTask = project.tasks.findByName('detekt')
         if (detektTask?.hasProperty('reports')) {
             def reports = detektTask.reports
@@ -82,7 +94,7 @@ class DetektConfigurator implements Configurator {
         }
 
         // Fallback to old Detekt versions
-        def output = resolveOutput(detekt)
+        def output = resolveOutput(detektExtension)
         if (!output) {
             throw new IllegalArgumentException(OUTPUT_NOT_DEFINED)
         }
